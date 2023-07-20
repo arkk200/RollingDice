@@ -1,41 +1,59 @@
-import { Canvas, MeshProps, useFrame } from "@react-three/fiber";
-import { useRef, useState } from "react";
-import * as THREE from "three";
+import { Canvas } from "@react-three/fiber";
 import "./App.css";
-
-function Box(props: MeshProps) {
-  const ref = useRef<THREE.Mesh>(null);
-
-  const [hovered, hover] = useState(false);
-  const [clicked, click] = useState(false);
-
-  useFrame((_, delta) => {
-    ref.current!.rotation.x += delta;
-  });
-
-  return (
-    <mesh
-      {...props}
-      ref={ref}
-      scale={clicked ? 1.5 : 1}
-      onClick={() => click(!clicked)}
-      onPointerOver={() => hover(true)}
-      onPointerOut={() => hover(false)}
-    >
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={hovered ? "hotpink" : "orange"} />
-    </mesh>
-  );
-}
+import { Suspense, useEffect, useRef, useState } from "react";
+import { Physics, RapierRigidBody, RigidBody } from "@react-three/rapier";
+// import { OrbitControls } from "@react-three/drei";
+import Floor from "./Floor/Floor";
+import Lights from "./Lights/Lights";
+import Dice from "./Dice/Dice";
+import useHandleDiceNumber from "./hooks/useHandleDiceNumber.hook";
 
 function App() {
+  const [dicePosition, setDicePosition] = useState<[number, number, number]>([
+    0, 4, 0,
+  ]);
+  const [rotation, setRotation] = useState<[number, number, number]>([0, 0, 0]);
+  const diceRigidRef = useRef<RapierRigidBody>(null);
+
+  const { handleDiceNumber } = useHandleDiceNumber(diceRigidRef);
+
+  useEffect(() => {
+    setRotation([Math.random() * 10, Math.random() * 10, Math.random() * 10]);
+  }, []);
+
+  const reRollDice = () => {
+    setRotation([Math.random() * 10, Math.random() * 10, Math.random() * 10]);
+    setDicePosition([0, 4 + Math.random(), 0]);
+  };
+
   return (
     <div className="App">
-      <Canvas>
-        <ambientLight />
-        <pointLight position={[10, 10, 10]} />
-        <Box position={[-1.2, 0, 0]} />
-        <Box position={[1.2, 0, 0]} />
+      <Canvas camera={{ position: [0, 5, 7] }}>
+        {/* <OrbitControls /> */}
+        <Suspense>
+          <Physics gravity={[0, -10, 0]} colliders={false}>
+            <Lights />
+            <RigidBody
+              ref={diceRigidRef}
+              colliders="cuboid"
+              position={dicePosition}
+              rotation={rotation}
+              onSleep={handleDiceNumber}
+              restitution={0.3}
+            >
+              <Dice onClick={reRollDice} />
+            </RigidBody>
+
+            <RigidBody
+              colliders="cuboid"
+              type="fixed"
+              friction={10}
+              position={[0, 0, 0]}
+            >
+              <Floor />
+            </RigidBody>
+          </Physics>
+        </Suspense>
       </Canvas>
     </div>
   );
